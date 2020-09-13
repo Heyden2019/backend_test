@@ -14,9 +14,9 @@ const upload = multer({
 
 const router = express.Router()
 
-// upload image
 //@ts-ignore
 router.post('/', isAuthenticated, upload.single('Image'), async (req: myReq, res, next) => {
+    if(!req.file?.filename || !req.file?.originalname) {return res.status(400).json({message: "Error. Try to download 1 'Image' with fileSize < 1000000"})}
     const prevImage: any = await Image.findOne({ user_id: req.session.userId }, (err): any => { if (err) return res.sendStatus(404) })
     if (prevImage) {
         prevImage.filename = req.file.filename

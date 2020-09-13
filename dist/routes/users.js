@@ -28,6 +28,14 @@ router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         res.sendStatus(500);
     }
 }));
+router.get("/me", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    yield User_1.default.findById(req.session.userId, (err, user) => {
+        if (err)
+            return res.sendStatus(500);
+        user.password = null;
+        return res.status(200).json(user);
+    });
+}));
 router.get("/logout", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     req.session.destroy(err => {
         if (err) {

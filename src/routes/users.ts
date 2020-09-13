@@ -18,6 +18,15 @@ router.get("/", async (req, res) => {
 })
 
 //@ts-ignore
+router.get("/me", isAuthenticated, async (req: myReq, res) => {
+    await User.findById(req.session.userId, (err, user: any) => {
+        if (err) return res.sendStatus(500)
+        user.password = null
+        return res.status(200).json(user)
+    })
+})
+
+//@ts-ignore
 router.get("/logout", isAuthenticated, async (req: myReq, res) => {
     req.session.destroy(err => {
         if (err) {

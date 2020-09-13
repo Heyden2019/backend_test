@@ -25,6 +25,10 @@ const upload = multer_1.default({
 });
 const router = express_1.default.Router();
 router.post('/', isAuthenticated_1.default, upload.single('Image'), (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    if (!((_a = req.file) === null || _a === void 0 ? void 0 : _a.filename) || !((_b = req.file) === null || _b === void 0 ? void 0 : _b.originalname)) {
+        return res.status(400).json({ message: "Error. Try to download 1 'Image' with fileSize < 1000000" });
+    }
     const prevImage = yield Image_1.default.findOne({ user_id: req.session.userId }, (err) => { if (err)
         return res.sendStatus(404); });
     if (prevImage) {
