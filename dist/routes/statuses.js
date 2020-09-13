@@ -40,7 +40,10 @@ router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     error ? res.sendStatus(404) : null;
 }));
 router.post("/", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { title, desc } = yield validator_1.statusCreateValidator(req.body);
+    const error = yield validator_1.statusCreateValidator(req.body);
+    if (error) {
+        return res.status(400).json(error);
+    }
     const status = new Status_1.default(Object.assign(Object.assign({}, req.body), { _id: new mongoose_1.default.Types.ObjectId() }));
     try {
         yield status.save();
@@ -52,16 +55,10 @@ router.post("/", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void
 }));
 router.put("/:id", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     delete req.body._id;
-    const { title, desc } = req.body;
-    if ((title && typeof title !== "string") || (desc && typeof desc !== 'string')) {
-        res.status(400).json({ message: "Title/desc must be string type" });
-        return;
+    let error = validator_1.statusUpdateValidator(req.body);
+    if (error) {
+        res.sendStatus(400).json(error);
     }
-    if ((typeof title === "string" && title.length < 1) || (typeof desc === "string" && desc.length < 1)) {
-        res.status(400).json({ message: "Title/desc must be at least 1 character" });
-        return;
-    }
-    let error = null;
     yield Status_1.default.updateOne({ _id: req.params.id }, req.body, (err, status) => {
         if (err || !status) {
             error = true;

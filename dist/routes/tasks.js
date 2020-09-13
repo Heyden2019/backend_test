@@ -41,8 +41,7 @@ router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () 
 router.post("/", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const error = yield validator_1.taskCreateValidator(req.body);
     if (error) {
-        res.status(400).json(error);
-        return;
+        return res.status(400).json(error);
     }
     const task = new Task_1.default(Object.assign(Object.assign({}, req.body), { createdAt: Date.now(), _id: new mongoose_1.default.Types.ObjectId(), user_id: req.session.userId }));
     try {
@@ -57,8 +56,7 @@ router.put("/:id", isAuthenticated_1.default, (req, res) => __awaiter(void 0, vo
     delete req.body._id;
     let error = yield validator_1.taskUpdateValidator(req.body);
     if (error) {
-        res.status(400).json(error);
-        return;
+        return res.status(400).json(error);
     }
     yield Task_1.default.updateOne({ _id: req.params.id }, Object.assign(Object.assign({}, req.body), { user_id: req.session.userId })).then(() => { res.sendStatus(200); })
         .catch(() => { res.sendStatus(404); });

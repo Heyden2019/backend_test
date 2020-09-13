@@ -33,7 +33,7 @@ router.get("/logout", isAuthenticated_1.default, (req, res) => __awaiter(void 0,
         if (err) {
             return res.send({ message: 'Logout error' });
         }
-        res.clearCookie('qid');
+        res.clearCookie(process.env.COOKIE_NAME);
         return res.status(200).json({ message: 'Logout success' });
     });
 }));
@@ -50,8 +50,7 @@ router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () 
 router.post("/register", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const error = yield validator_1.registerValidator(req.body);
     if (error) {
-        res.status(400).json(error);
-        return;
+        return res.status(400).json(error);
     }
     console.log(req.body.password);
     const hashedPassword = yield argon2_1.default.hash(req.body.password);
@@ -68,8 +67,7 @@ router.post("/register", (req, res) => __awaiter(void 0, void 0, void 0, functio
 }));
 router.post("/login", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     if (!req.body.email || !req.body.password) {
-        res.status(400).json({ message: "All fields are required" });
-        return;
+        return res.status(400).json({ message: "All fields are required" });
     }
     let error;
     const user = yield User_1.default.findOne({ email: req.body.email }, (err, user) => {
@@ -78,13 +76,11 @@ router.post("/login", (req, res) => __awaiter(void 0, void 0, void 0, function* 
         }
     }).select("+password");
     if (error) {
-        res.status(400).json(error);
-        return;
+        return res.status(400).json(error);
     }
     const valid = yield argon2_1.default.verify(user.password, req.body.password.toString());
     if (!valid) {
-        res.status(400).json({ message: "Password incorrect" });
-        return;
+        return res.status(400).json({ message: "Password incorrect" });
     }
     else {
         user.password = null;
@@ -96,14 +92,12 @@ router.put("/", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 
     delete req.body._id;
     let error = validator_1.userUpdateValidator(req.body);
     if (error) {
-        res.status(400).json(error);
-        return;
+        return res.status(400).json(error);
     }
     let body = req.body;
     if (req.body.password) {
         if (req.body.password.toString().length < 6) {
-            res.status(400).json({ message: "Password mush be at least 6 characters" });
-            return;
+            return res.status(400).json({ message: "Password mush be at least 6 characters" });
         }
         body.password = yield argon2_1.default.hash(req.body.password.toString());
     }

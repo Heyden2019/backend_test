@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import express from 'express';
 import Status from '../models/Status';
 import isAuthenticated from "./../util/isAuthenticated"
-import {statusCreateValidator} from "./../util/validator"
+import {statusCreateValidator, statusUpdateValidator} from "./../util/validator"
 
 const router = express.Router()
 
@@ -29,8 +29,10 @@ router.get("/:id", async (req, res) => {
 
 //@ts-ignore
 router.post("/", isAuthenticated, async (req, res) => {
-    const {title, desc} = await statusCreateValidator(req.body)
-   
+    const error = await statusCreateValidator(req.body)
+    if (error) {
+        return res.status(400).json(error)
+    }
     const status = new Status({
         ...req.body,
         _id: new mongoose.Types.ObjectId(),
@@ -46,16 +48,11 @@ router.post("/", isAuthenticated, async (req, res) => {
 //@ts-ignore
 router.put("/:id", isAuthenticated, async (req, res) => {
     delete req.body._id
-    const {title, desc} = req.body
-    if ((title && typeof title !== "string" )|| (desc && typeof desc !== 'string')) {
-        res.status(400).json({message: "Title/desc must be string type"})
-        return;
+    let error: any = statusUpdateValidator(req.body)
+    if (error) {
+        res.sendStatus(400).json(error)
     }
-    if ( (typeof title === "string" && title.length < 1) || (typeof desc === "string" && desc.length < 1)) {
-        res.status(400).json({message: "Title/desc must be at least 1 character"})
-        return;
-    }
-    let error = null as any
+    
     await Status.updateOne({_id: req.params.id}, req.body, (err, status) => {
         if (err || !status) {
             error = true

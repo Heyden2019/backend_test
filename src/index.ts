@@ -3,16 +3,20 @@ import mongoose from "mongoose"
 import tasksRoutes from "./routes/tasks"
 import usersRoutes from "./routes/users"
 import statusesRoutes from "./routes/statuses"
+import imagesRoutes from "./routes/images"
 import bodyParser from "body-parser"
 import session from "express-session"
 import connectMongo from "connect-mongo"
+import dotenv from "dotenv"
+
+dotenv.config()
 
 const app = express()
 
 app.use(bodyParser.json())
 
 mongoose.connect(
-    "mongodb://localhost/testdb",
+    process.env.MONGO_DB_URL as string,
     {
         useNewUrlParser: true,
         useUnifiedTopology: true
@@ -24,9 +28,9 @@ const MongoStore = connectMongo(session)
 
 app.use(
     session({
-        name: "qid",
+        name: process.env.COOKIE_NAME as string,
         store: new MongoStore({
-            url: "mongodb://localhost/testdb",
+            url: process.env.MONGO_DB_URL as string,
             stringify: false,
         }),
         cookie: {
@@ -34,7 +38,7 @@ app.use(
             maxAge: 1000 * 60 * 60 * 24 * 365 * 10, //10 years
             sameSite: "lax"
         },
-        secret: 'secret',
+        secret: process.env.SECRET as string,
         resave: false,
         saveUninitialized: false
     })
@@ -43,7 +47,8 @@ app.use(
 app.use("/tasks", tasksRoutes)
 app.use("/users", usersRoutes)
 app.use("/statuses", statusesRoutes)
+app.use("/images", imagesRoutes)
 
-app.listen(process.env.PORT, () => {
-    console.log("server started on port: " + process.env.PORT)
+app.listen(process.env.PORT as string, () => {
+    console.log("server started on port: " + process.env.PORT as string)
 })

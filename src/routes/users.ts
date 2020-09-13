@@ -23,7 +23,7 @@ router.get("/logout", isAuthenticated, async (req: myReq, res) => {
         if (err) {
             return res.send({ message: 'Logout error' })
         }
-        res.clearCookie('qid')
+        res.clearCookie(process.env.COOKIE_NAME as string)
         return res.status(200).json({ message: 'Logout success' })
     })
 })
@@ -42,8 +42,7 @@ router.get("/:id", async (req, res) => {
 router.post("/register", async (req: myReq, res) => {
     const error = await registerValidator(req.body)
     if (error) {
-        res.status(400).json(error)
-        return;
+        return res.status(400).json(error)
     }
 
     console.log(req.body.password)
@@ -67,8 +66,7 @@ router.post("/register", async (req: myReq, res) => {
 //@ts-ignore
 router.post("/login", async (req: myReq, res) => {
     if(!req.body.email || !req.body.password) {
-        res.status(400).json({ message: "All fields are required" })
-        return;
+        return res.status(400).json({ message: "All fields are required" })
     }
 
     let error
@@ -79,15 +77,13 @@ router.post("/login", async (req: myReq, res) => {
     }).select("+password") as any
 
     if (error) {
-        res.status(400).json(error)
-        return;
+        return res.status(400).json(error)
     }
 
     //@ts-ignore
     const valid = await argon2.verify(user.password, req.body.password.toString())
     if (!valid) {
-        res.status(400).json({ message: "Password incorrect" })
-        return;
+        return res.status(400).json({ message: "Password incorrect" })
     } else {
         user.password = null
         req.session.userId = user._id
@@ -100,14 +96,13 @@ router.put("/", isAuthenticated, async (req: myReq, res) => {
     delete req.body._id
     let error = userUpdateValidator(req.body)
     if(error) {
-        res.status(400).json(error)
-        return;
+        return res.status(400).json(error)
+
     }
     let body = req.body
     if(req.body.password) {
         if (req.body.password.toString().length < 6) {
-            res.status(400).json({message: "Password mush be at least 6 characters"})
-            return;
+            return res.status(400).json({message: "Password mush be at least 6 characters"})
         }
         body.password = await argon2.hash(req.body.password.toString())
     } 

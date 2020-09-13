@@ -31,8 +31,7 @@ router.get("/:id", async (req, res) => {
 router.post("/", isAuthenticated, async (req: myReq, res) => {
    const error = await taskCreateValidator(req.body)
    if (error) {
-       res.status(400).json(error)
-       return;
+       return res.status(400).json(error)
    }
     const task = new Task({
         ...req.body,
@@ -54,8 +53,7 @@ router.put("/:id", isAuthenticated, async (req: myReq, res) => {
     let error = await taskUpdateValidator(req.body)
     
     if (error) {
-        res.status(400).json(error)
-        return;
+        return res.status(400).json(error)
     }
     await Task.updateOne({ _id: req.params.id }, {
         ...req.body,
