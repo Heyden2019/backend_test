@@ -5,12 +5,9 @@ import usersRoutes from "./routes/users"
 import statusesRoutes from "./routes/statuses"
 import bodyParser from "body-parser"
 import session from "express-session"
-import passport from "passport"
-import passportStr from "./passport"
+import connectMongo from "connect-mongo"
 
 const app = express()
-
-passportStr(passport)
 
 app.use(bodyParser.json())
 
@@ -23,16 +20,25 @@ mongoose.connect(
 ).then(() => console.log("mongo started"))
 .catch((err) => console.error(err))
 
+const MongoStore = connectMongo(session) 
+
 app.use(
     session({
-      secret: 'secret',
-      resave: true,
-      saveUninitialized: true
+        name: "qid",
+        store: new MongoStore({
+            url: "mongodb://localhost/testdb",
+            stringify: false,
+        }),
+        cookie: {
+            httpOnly: true,
+            maxAge: 1000 * 60 * 60 * 24 * 365 * 10, //10 years
+            sameSite: "lax"
+        },
+        secret: 'secret',
+        resave: false,
+        saveUninitialized: false
     })
 );
-
-app.use(passport.initialize());
-app.use(passport.session());
 
 app.use("/tasks", tasksRoutes)
 app.use("/users", usersRoutes)

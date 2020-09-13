@@ -1,0 +1,1 @@
+{"version":3,"file":"isAuthenticated.js","sourceRoot":"","sources":["../../src/util/isAuthenticated.ts"],"names":[],"mappings":";;AAGA,kBAAe,CAAC,GAAU,EAAE,GAAa,EAAE,IAAS,EAAE,EAAE;IACpD,IAAI,GAAG,CAAC,OAAO,CAAC,MAAM,EAAE;QAChB,OAAO,IAAI,EAAE,CAAA;KACpB;IACD,GAAG,CAAC,UAAU,CAAC,GAAG,CAAC,CAAA;AACvB,CAAC,CAAA"}

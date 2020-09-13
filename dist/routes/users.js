@@ -17,62 +17,114 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const express_1 = __importDefault(require("express"));
 const User_1 = __importDefault(require("../models/User"));
 const argon2_1 = __importDefault(require("argon2"));
-const passport_1 = __importDefault(require("passport"));
+const isAuthenticated_1 = __importDefault(require("./../util/isAuthenticated"));
 const router = express_1.default.Router();
 router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const users = yield User_1.default.find().exec();
-    res.status(200).json(users);
-}));
-router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const user = yield User_1.default.findById(req.params.id).exec();
-        res.status(200).json(user);
+        const users = yield User_1.default.find().select("-password").exec();
+        res.status(200).json(users);
     }
     catch (err) {
-        res.status(404).json(err.message);
+        res.sendStatus(500);
     }
 }));
+router.get("/logout", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    req.session.destroy(err => {
+        if (err) {
+            return res.send({ message: 'Logout error' });
+        }
+        res.clearCookie('qid');
+        return res.status(200).json({ message: 'Logout success' });
+    });
+}));
+router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    yield User_1.default.findById(req.params.id, (err, user) => {
+        if (err || !user) {
+            res.status(404).json({ message: "404 not found" });
+        }
+        else {
+            res.status(200).json(user);
+        }
+    }).select("-password");
+}));
 router.post("/register", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const errors = yield validator_1.registerValidator(req.body);
-    if (errors)
-        res.status(400).json(errors);
+    const error = yield validator_1.registerValidator(req.body);
+    if (error) {
+        res.status(400).json(error);
+        return;
+    }
+    console.log(req.body.password);
     const hashedPassword = yield argon2_1.default.hash(req.body.password);
     const user = new User_1.default(Object.assign(Object.assign({}, req.body), { password: hashedPassword, _id: new mongoose_1.default.Types.ObjectId() }));
     try {
         yield user.save();
-        console.log(user);
+        req.session.userId = user._id;
+        res.status(201).json(user);
     }
     catch (err) {
-        console.log('err', err);
-        res.status(400).json(err.message);
+        console.error(err);
+        res.sendStatus(500);
     }
 }));
-router.post('/login', (req, res, next) => {
-    passport_1.default.authenticate('local', {}, () => {
-        res.sendStatus(200);
-    })(req, res, next);
-});
-router.get('/logout', (req, res) => {
-    req.logout();
-    res.sendStatus(200);
-});
-router.put("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const task = yield User_1.default.updateOne({ _id: req.params.id }, req.body);
-        res.status(200).json(task);
+router.post("/login", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!req.body.email || !req.body.password) {
+        res.status(400).json({ message: "All fields are required" });
+        return;
     }
-    catch (err) {
-        res.status(400).json(err.message);
+    let error;
+    const user = yield User_1.default.findOne({ email: req.body.email }, (err, user) => {
+        if (err || !user) {
+            error = { message: "Email incorrect" };
+        }
+    }).select("+password");
+    if (error) {
+        res.status(400).json(error);
+        return;
+    }
+    const valid = yield argon2_1.default.verify(user.password, req.body.password.toString());
+    if (!valid) {
+        res.status(400).json({ message: "Password incorrect" });
+        return;
+    }
+    else {
+        user.password = null;
+        req.session.userId = user._id;
+        res.status(200).json(user);
     }
 }));
-router.delete("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        yield User_1.default.deleteOne({ _id: req.params.id });
-        res.sendStatus(200);
+router.put("/", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    delete req.body._id;
+    let error = validator_1.userUpdateValidator(req.body);
+    if (error) {
+        res.status(400).json(error);
+        return;
     }
-    catch (err) {
-        res.status(404).json(err.message);
+    let body = req.body;
+    if (req.body.password) {
+        if (req.body.password.toString().length < 6) {
+            res.status(400).json({ message: "Password mush be at least 6 characters" });
+            return;
+        }
+        body.password = yield argon2_1.default.hash(req.body.password.toString());
     }
+    const user = yield User_1.default.updateOne({ _id: req.session.userId }, body);
+    res.status(200).json(user);
+}));
+router.delete("/", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    yield User_1.default.deleteOne({ _id: req.session.userId }, error => {
+        if (error) {
+            res.send({ message: 'error' });
+        }
+        else {
+            req.session.destroy(err => {
+                if (err) {
+                    return res.send({ message: 'error' });
+                }
+                res.clearCookie('qid');
+                return res.status(200).json({ message: 'You were deleted successful' });
+            });
+        }
+    });
 }));
 exports.default = router;
 //# sourceMappingURL=users.js.map

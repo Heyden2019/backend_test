@@ -15,47 +15,67 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importDefault(require("mongoose"));
 const express_1 = __importDefault(require("express"));
 const Status_1 = __importDefault(require("../models/Status"));
+const isAuthenticated_1 = __importDefault(require("./../util/isAuthenticated"));
+const validator_1 = require("./../util/validator");
 const router = express_1.default.Router();
 router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const statuses = yield Status_1.default.find().exec();
-    res.status(200).json(statuses);
-}));
-router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const status = yield Status_1.default.findById(req.params.id).exec();
-        res.status(200).json(status);
+        const statuses = yield Status_1.default.find().exec();
+        res.status(200).json(statuses);
     }
     catch (err) {
-        res.status(404).json(err.message);
+        res.sendStatus(500);
     }
 }));
-router.post("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    let error = null;
+    yield Status_1.default.findById(req.params.id, (err, status) => {
+        if (err || !status) {
+            error = true;
+        }
+        else {
+            res.status(200).json(status);
+        }
+    }).catch(() => { error = true; });
+    error ? res.sendStatus(404) : null;
+}));
+router.post("/", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { title, desc } = yield validator_1.statusCreateValidator(req.body);
     const status = new Status_1.default(Object.assign(Object.assign({}, req.body), { _id: new mongoose_1.default.Types.ObjectId() }));
     try {
         yield status.save();
         res.status(201).json(status);
     }
     catch (err) {
-        res.status(400).json(err.message);
+        res.sendStatus(400);
     }
 }));
-router.put("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const status = yield Status_1.default.updateOne({ _id: req.params.id }, req.body);
-        res.status(200).json(status);
+router.put("/:id", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    delete req.body._id;
+    const { title, desc } = req.body;
+    if ((title && typeof title !== "string") || (desc && typeof desc !== 'string')) {
+        res.status(400).json({ message: "Title/desc must be string type" });
+        return;
     }
-    catch (err) {
-        res.status(400).json(err.message);
+    if ((typeof title === "string" && title.length < 1) || (typeof desc === "string" && desc.length < 1)) {
+        res.status(400).json({ message: "Title/desc must be at least 1 character" });
+        return;
     }
+    let error = null;
+    yield Status_1.default.updateOne({ _id: req.params.id }, req.body, (err, status) => {
+        if (err || !status) {
+            error = true;
+        }
+        else {
+            res.sendStatus(200);
+        }
+    }).catch(() => { error = true; });
+    error ? res.sendStatus(404) : null;
 }));
-router.delete("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        yield Status_1.default.deleteOne({ _id: req.params.id });
-        res.sendStatus(200);
-    }
-    catch (err) {
-        res.status(404).json(err.message);
-    }
+router.delete("/:id", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    let error = null;
+    yield Status_1.default.deleteOne({ _id: req.params.id }).catch(() => { error = true; });
+    error ? res.sendStatus(404) : res.status(200).json({ message: "Deleted successful" });
 }));
 exports.default = router;
 //# sourceMappingURL=statuses.js.map
