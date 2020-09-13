@@ -1,0 +1,6 @@
+{
+    "env": {
+        "MONGO_URL": "mongodb://localhost/testdb",
+        "PORT": 4000
+    }
+}
