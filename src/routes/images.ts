@@ -4,7 +4,7 @@ import path from "path"
 import isAuthenticated from "./../util/isAuthenticated"
 import Image from "./../models/Image"
 import fs from "fs"
-import multer, { MulterError } from 'multer';
+import multer from 'multer';
 import User from '../models/User';
 
 const UPLOAD_PATH = path.resolve(__dirname, '../images')
@@ -23,7 +23,7 @@ const router = express.Router()
 
 //@ts-ignore
 router.post('/', isAuthenticated, async (req: myReq, res, next) => {
-    upload(req, res, (err: any) => {
+    upload(req, res, (err: any): any => {
         if (err) {
             if (err.code === 'LIMIT_FILE_SIZE') {
                 return res.status(400).json(err)
