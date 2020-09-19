@@ -12,30 +12,34 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const validator_1 = require("./../util/validator");
+const userValidator_1 = require("./../util/validators/userValidator");
 const mongoose_1 = __importDefault(require("mongoose"));
 const express_1 = __importDefault(require("express"));
 const User_1 = __importDefault(require("../models/User"));
 const argon2_1 = __importDefault(require("argon2"));
 const isAuthenticated_1 = __importDefault(require("./../util/isAuthenticated"));
+const express_validator_1 = require("express-validator");
 const router = express_1.default.Router();
-router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const users = yield User_1.default.find().select("-password").exec();
+router.get("/", (req, res) => {
+    User_1.default.find().select("-password")
+        .then(users => {
         res.status(200).json(users);
-    }
-    catch (err) {
-        res.sendStatus(500);
-    }
-}));
-router.get("/me", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    yield User_1.default.findById(req.session.userId, (err, user) => {
-        if (err)
-            return res.sendStatus(500);
-        user.password = null;
-        return res.status(200).json(user);
+    })
+        .catch(err => {
+        res.status(500).json({ message: "Server error" });
     });
-}));
+});
+router.get("/me", isAuthenticated_1.default, (req, res) => {
+    User_1.default.findById(req.session.userId)
+        .then((user) => {
+        user = user.toObject();
+        delete user.password;
+        res.status(200).json(user);
+    })
+        .catch(err => {
+        res.status(500).json({ message: "Server error" });
+    });
+});
 router.get("/logout", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     req.session.destroy(err => {
         if (err) {
@@ -45,87 +49,85 @@ router.get("/logout", isAuthenticated_1.default, (req, res) => __awaiter(void 0,
         return res.status(200).json({ message: 'Logout success' });
     });
 }));
-router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    yield User_1.default.findById(req.params.id, (err, user) => {
-        if (err || !user) {
-            res.status(404).json({ message: "404 not found" });
-        }
-        else {
-            res.status(200).json(user);
-        }
-    }).select("-password");
-}));
-router.post("/register", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const error = yield validator_1.registerValidator(req.body);
-    if (error) {
-        return res.status(400).json(error);
+router.get("/:id", (req, res) => {
+    User_1.default.findById(req.params.id).select("-password")
+        .then(user => {
+        user
+            ? res.status(200).json(user)
+            : res.status(404).json({ message: "404 not found" });
+    })
+        .catch(err => {
+        res.status(404).json({ message: "404 not found" });
+    });
+});
+router.post("/register", userValidator_1.registerValidator, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    delete req.body.image_id;
+    const errors = express_validator_1.validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array({ onlyFirstError: true }) });
     }
-    console.log(req.body.password);
     const hashedPassword = yield argon2_1.default.hash(req.body.password);
-    const user = new User_1.default(Object.assign(Object.assign({}, req.body), { password: hashedPassword, _id: new mongoose_1.default.Types.ObjectId() }));
-    try {
-        yield user.save();
+    const user = yield new User_1.default(Object.assign(Object.assign({}, req.body), { password: hashedPassword, _id: new mongoose_1.default.Types.ObjectId() }));
+    user.save()
+        .then((user) => {
         req.session.userId = user._id;
+        user = user.toObject();
+        delete user.password;
         res.status(201).json(user);
-    }
-    catch (err) {
-        console.error(err);
-        res.sendStatus(500);
-    }
+    })
+        .catch(err => {
+        res.status(500).send('Server Error');
+    });
 }));
-router.post("/login", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    if (!req.body.email || !req.body.password) {
-        return res.status(400).json({ message: "All fields are required" });
+router.post("/login", userValidator_1.loginValidator, (req, res) => {
+    const errors = express_validator_1.validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array({ onlyFirstError: true }) });
     }
-    let error;
-    const user = yield User_1.default.findOne({ email: req.body.email }, (err, user) => {
-        if (err || !user) {
-            error = { message: "Email incorrect" };
-        }
-    }).select("+password");
-    if (error) {
-        return res.status(400).json(error);
-    }
-    const valid = yield argon2_1.default.verify(user.password, req.body.password.toString());
-    if (!valid) {
-        return res.status(400).json({ message: "Password incorrect" });
-    }
-    else {
-        user.password = null;
+    User_1.default.findOne({ email: req.body.email })
+        .then((user) => {
         req.session.userId = user._id;
+        user = user.toObject();
+        delete user.password;
         res.status(200).json(user);
-    }
-}));
-router.put("/", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    })
+        .catch(() => {
+        res.status(500).json({ message: "Server error" });
+    });
+});
+router.put("/", isAuthenticated_1.default, userValidator_1.userUpdateValidator, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     delete req.body._id;
-    let error = validator_1.userUpdateValidator(req.body);
-    if (error) {
-        return res.status(400).json(error);
+    delete req.body.image_id;
+    const errors = express_validator_1.validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array({ onlyFirstError: true }) });
     }
-    let body = req.body;
     if (req.body.password) {
-        if (req.body.password.toString().length < 6) {
-            return res.status(400).json({ message: "Password mush be at least 6 characters" });
-        }
-        body.password = yield argon2_1.default.hash(req.body.password.toString());
+        req.body.password = yield argon2_1.default.hash(req.body.password);
     }
-    const user = yield User_1.default.updateOne({ _id: req.session.userId }, body);
-    res.status(200).json(user);
+    User_1.default.findOneAndUpdate({ _id: req.session.userId }, req.body).select('-password')
+        .then((user) => {
+        user
+            ? res.status(200).json(user)
+            : res.status(500).json({ message: "Server error" });
+    })
+        .catch(err => {
+        res.status(500).json({ message: "Server error" });
+    });
 }));
 router.delete("/", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    yield User_1.default.deleteOne({ _id: req.session.userId }, error => {
-        if (error) {
-            res.send({ message: 'error' });
-        }
-        else {
-            req.session.destroy(err => {
-                if (err) {
-                    return res.send({ message: 'error' });
-                }
-                res.clearCookie('qid');
-                return res.status(200).json({ message: 'You were deleted successful' });
-            });
-        }
+    yield User_1.default.deleteOne({ _id: req.session.userId })
+        .then(() => {
+        req.session.destroy(err => {
+            if (err) {
+                return res.status(500).json({ message: "Server error" });
+            }
+            res.clearCookie(process.env.COOKIE_NAME);
+            return res.status(200).json({ message: 'You were deleted successful' });
+        });
+    })
+        .catch(err => {
+        res.status(500).json({ message: "Server error" });
     });
 }));
 exports.default = router;

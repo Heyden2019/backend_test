@@ -3,74 +3,90 @@ import mongoose from 'mongoose';
 import express from 'express';
 import Task from '../models/Task';
 import isAuthenticated from "./../util/isAuthenticated"
-import {taskCreateValidator, taskUpdateValidator} from './../util/validator';
+import {taskCreateValidator, taskUpdateValidator} from './../util/validators/taskValidator';
+import { validationResult } from 'express-validator';
 
 const router = express.Router()
 
-router.get("/", async (req, res) => {
-    await Task.find(req.query.status_id ? { status_id: req.query.status_id } : null, (err, tasks) => {
-        if(err) {
-            res.sendStatus(500).json({message: "error"})
-        } else {
-            res.status(200).json(tasks)
-        }
+router.get("/", (req, res) => {
+    Task.find(req.query.status_id ? { status_id: req.query.status_id } : {})
+    .then(tasks => {
+        res.status(200).json(tasks)
+    })
+    .catch(err => {
+        res.status(404).json({ message: "404 not found" })
     })
 })
 
-router.get("/:id", async (req, res) => {
-    await Task.findById(req.params.id, (err, task) => {
-        if (err || !task) {
-            res.sendStatus(404)
-        } else {
-            res.status(200).json(task)
-        }
-    }) 
+router.get("/:id", (req, res) => {
+    Task.findById(req.params.id)
+    .then(task => {
+        task
+        ? res.status(200).json(task)
+        : res.status(404).json({ message: "404 not found" })
+    })
+    .catch(err => {
+        res.status(404).json({ message: "404 not found" })
+    })
 })
 
 //@ts-ignore
-router.post("/", isAuthenticated, async (req: myReq, res) => {
-   const error = await taskCreateValidator(req.body)
-   if (error) {
-       return res.status(400).json(error)
+router.post("/", isAuthenticated, taskCreateValidator, (req: myReq, res) => {
+   const errors = validationResult(req)
+   if (!errors.isEmpty()) {
+       return res.status(400).json({errors: errors.array({onlyFirstError: true})})
    }
+
     const task = new Task({
         ...req.body,
         createdAt: Date.now(),
         _id: new mongoose.Types.ObjectId(),
         user_id: req.session.userId
     })
-    try {
-        await task.save()
+    task.save()
+    .then(task => {
         res.status(201).json(task)
-    } catch (err) {
-        res.sendStatus(400)
-    }
+    })
+    .catch(err => {
+        res.status(500).json({message: "Server error"})
+    })
 })
 
 //@ts-ignore
-router.put("/:id", isAuthenticated, async (req: myReq, res) => {
+router.put("/:id", isAuthenticated, taskUpdateValidator, (req: myReq, res) => {
     delete req.body._id
-    let error = await taskUpdateValidator(req.body)
+    delete req.body.createdAt
     
-    if (error) {
-        return res.status(400).json(error)
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+        return res.status(400).json({errors: errors.array({onlyFirstError: true})})
     }
-    await Task.updateOne({ _id: req.params.id }, {
+    
+    Task.findByIdAndUpdate(req.params.id, {
         ...req.body,
         user_id: req.session.userId
-    }).then(() => {res.sendStatus(200)})
-    .catch(() => {res.sendStatus(404)})
+    })
+    .then(task => {
+        task
+        ? res.status(200).json(task)
+        : res.status(404).json({ message: "404 not found" })
+    })
+    .catch(err=> {
+        res.status(404).json({ message: "404 not found" })
+    })
 })
 
 //@ts-ignore
-router.delete("/:id", isAuthenticated, async (req: myReq, res) => {
-    let error = null as any
-    await Task.deleteOne({ _id: req.params.id }, (err) => {
-        err ? error = true : null
-    }).catch(() => {
-        error = true
+router.delete("/:id", isAuthenticated, (req: myReq, res) => {
+    Task.findByIdAndDelete(req.params.id)
+    .then(task => {
+        task
+        ? res.status(200).json({message: "Deleted successful"})
+        : res.status(404).json({ message: "404 not found" })
     })
-    error ? res.status(404) : res.status(200).json({message: "Deleted successful"})
+    .catch(err => {
+        res.status(404).json({ message: "404 not found" })
+    })
 })
 
 export default router

@@ -1,28 +1,34 @@
 import { myReq } from './../types';
-import { registerValidator, userUpdateValidator } from './../util/validator';
+import { registerValidator, userUpdateValidator, loginValidator } from './../util/validators/userValidator';
 import mongoose from 'mongoose';
 import express from 'express';
 import User from '../models/User';
 import argon2 from "argon2";
 import isAuthenticated from "./../util/isAuthenticated"
+import { validationResult } from 'express-validator';
 
 const router = express.Router()
 
-router.get("/", async (req, res) => {
-    try {
-        const users = await User.find().select("-password").exec()
+router.get("/", (req, res) => {
+    User.find().select("-password")
+    .then(users => {
         res.status(200).json(users)
-    } catch (err) {
-        res.sendStatus(500)
-    }
+    })
+    .catch(err => {
+        res.status(500).json({message: "Server error"})
+    })
 })
 
 //@ts-ignore
-router.get("/me", isAuthenticated, async (req: myReq, res) => {
-    await User.findById(req.session.userId, (err, user: any) => {
-        if (err) return res.sendStatus(500)
-        user.password = null
-        return res.status(200).json(user)
+router.get("/me", isAuthenticated, (req: myReq, res) => {
+    User.findById(req.session.userId)
+    .then((user: any) => {
+        user = user.toObject()
+        delete user.password
+        res.status(200).json(user)
+    })
+    .catch(err => {
+        res.status(500).json({message: "Server error"})
     })
 })
 
@@ -37,102 +43,102 @@ router.get("/logout", isAuthenticated, async (req: myReq, res) => {
     })
 })
 
-router.get("/:id", async (req, res) => {
-    await User.findById(req.params.id, (err, user) => {
-        if (err || !user) {
-            res.status(404).json({ message: "404 not found" })
-        } else {
-            res.status(200).json(user)
-        }
-    }).select("-password")
+router.get("/:id", (req, res) => {
+    User.findById(req.params.id).select("-password")
+    .then(user => {
+        user 
+        ? res.status(200).json(user) 
+        : res.status(404).json({ message: "404 not found" })
+    })
+    .catch(err => {
+        res.status(404).json({ message: "404 not found" })
+    })
 })
 
 //@ts-ignore
-router.post("/register", async (req: myReq, res) => {
-    const error = await registerValidator(req.body)
-    if (error) {
-        return res.status(400).json(error)
+router.post("/register", registerValidator, async (req: myReq, res) => {
+    delete req.body.image_id
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+        return res.status(400).json({errors: errors.array({onlyFirstError: true})}) 
     }
 
-    console.log(req.body.password)
-
     const hashedPassword = await argon2.hash(req.body.password)
-    const user = new User({
+    const user = await new User({
         ...req.body,
         password: hashedPassword,
         _id: new mongoose.Types.ObjectId()
     })
-    try {
-        await user.save()
+
+    user.save()
+    .then((user: any) => {
         req.session.userId = user._id
+        user = user.toObject()
+        delete user.password
         res.status(201).json(user)
-    } catch (err) {
-        console.error(err)
-        res.sendStatus(500)
-    }
+    })
+    .catch(err => {
+        res.status(500).send('Server Error')
+    })
 })
 
 //@ts-ignore
-router.post("/login", async (req: myReq, res) => {
-    if(!req.body.email || !req.body.password) {
-        return res.status(400).json({ message: "All fields are required" })
+router.post("/login", loginValidator, (req: myReq, res) => {
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+        return res.status(400).json({errors: errors.array({onlyFirstError: true})})
     }
-
-    let error
-    const user = await User.findOne({ email: req.body.email }, (err, user) => {
-        if (err || !user) {
-            error = { message: "Email incorrect" }
-        }
-    }).select("+password") as any
-
-    if (error) {
-        return res.status(400).json(error)
-    }
-
-    //@ts-ignore
-    const valid = await argon2.verify(user.password, req.body.password.toString())
-    if (!valid) {
-        return res.status(400).json({ message: "Password incorrect" })
-    } else {
-        user.password = null
+    User.findOne({ email: req.body.email })
+    .then((user: any) => {
         req.session.userId = user._id
+        user = user.toObject()
+        delete user.password
         res.status(200).json(user)
-    }
+    })
+    .catch(() => {
+        res.status(500).json({message: "Server error"})
+    })
 })
 
 //@ts-ignore
-router.put("/", isAuthenticated, async (req: myReq, res) => {
+router.put("/", isAuthenticated, userUpdateValidator, async (req: myReq, res) => {
     delete req.body._id
-    let error = userUpdateValidator(req.body)
-    if(error) {
-        return res.status(400).json(error)
+    delete req.body.image_id
 
+    const errors = validationResult(req)
+    if(!errors.isEmpty()) {
+        return res.status(400).json({errors: errors.array({onlyFirstError: true})})
     }
-    let body = req.body
+
     if(req.body.password) {
-        if (req.body.password.toString().length < 6) {
-            return res.status(400).json({message: "Password mush be at least 6 characters"})
-        }
-        body.password = await argon2.hash(req.body.password.toString())
+        req.body.password = await argon2.hash(req.body.password)
     } 
-    const user = await User.updateOne({ _id: req.session.userId }, body)
-    res.status(200).json(user)
+
+    User.findOneAndUpdate({_id: req.session.userId}, req.body).select('-password')
+    .then((user: any) => {
+        user
+        ? res.status(200).json(user)
+        : res.status(500).json({message: "Server error"})
+    })
+    .catch(err => {
+        res.status(500).json({message: "Server error"})
+    })
 })
 
 //@ts-ignore
 router.delete("/", isAuthenticated, async (req: myReq, res) => {
-    await User.deleteOne({ _id: req.session.userId }, error => {
-        if (error) {
-            res.send({ message: 'error' })
-        } else {
-            req.session.destroy(err => {
-                if (err) {
-                    return res.send({ message: 'error' })
-                }
-                res.clearCookie('qid')
-                return res.status(200).json({ message: 'You were deleted successful' })
-            })
-        }
+    await User.deleteOne({ _id: req.session.userId })
+    .then(() => {
+        req.session.destroy(err => {
+            if (err) {
+                return res.status(500).json({message: "Server error"})
+            }
+            res.clearCookie(process.env.COOKIE_NAME as string)
+            return res.status(200).json({ message: 'You were deleted successful' })
+        })
+    })
+    .catch(err => {
+        res.status(500).json({message: "Server error"})
     })
 })
 

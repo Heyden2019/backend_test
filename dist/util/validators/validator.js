@@ -158,9 +158,4 @@ exports.statusUpdateValidator = ({ desc, title }) => __awaiter(void 0, void 0, v
     }
     return null;
 });
-const errorCreator = () => {
-    return {
-        errors: 
-    };
-};
 //# sourceMappingURL=validator.js.map

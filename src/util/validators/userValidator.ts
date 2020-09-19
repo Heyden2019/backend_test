@@ -1,6 +1,4 @@
-import User from "./../models/User"
-import {taskValidatorPropsType, statusValidatorPropsType} from "./../types"
-import Status from "./../models/Status"
+import User from "./../../models/User"
 import { check } from "express-validator"
 import argon2 from "argon2";
 
@@ -30,7 +28,7 @@ export const registerValidator = [
                 if (user) {
                   return Promise.reject('Email already exist');
                 }
-                return null
+                return Promise.resolve()
             })
         }).withMessage('Email already exist'),
 ]
@@ -62,28 +60,6 @@ export const loginValidator = [
         }),
 ]
 
-
-export const taskCreateValidator = async ({title, status_id, desc}: taskValidatorPropsType) => {
-    
-    if (!title || !status_id || !desc ) {
-        return {message: "Enter all fields"}
-    }
-    if (typeof title !== 'string' || typeof status_id !== 'string' || typeof desc !== 'string' ) {
-        return {message: "All fields must be 'string'"}
-    }
-    if(title.length < 6 || desc.length < 6) {
-        return {message: "Title and Desc must be at least 6 characters"}
-    }
-   
-    let error = null as any
-    await Status.findById(status_id, (err, status) => {
-        if(err || !status) {
-            error = {message: "Invalid status_id"}
-        }
-    }).catch(e=>  error = {message: "Invalid status_id"})
-    return error
-}
-
 export const userUpdateValidator = [
     check('firstName').optional()
         .trim().notEmpty().withMessage('Required')
@@ -112,64 +88,3 @@ export const userUpdateValidator = [
         .isLength({min: 6}).withMessage('Min password length - 6')
         .isLength({max: 20}).withMessage('Max password length - 20'),
 ]
-
-export const taskUpdateValidator = async ({title, status_id, desc}: taskValidatorPropsType) => {
-    
-    if(typeof title !== 'undefined' && (typeof title !== 'string' || title.length < 6)) {
-        return {message: "Invalid title"}
-        
-    }
-    if(typeof desc !== 'undefined' && (typeof desc !== 'string' || desc.length < 6)) {
-        return {message: "Invalid desc"}
-        
-    }
-
-    let error = null as any
-    if(status_id) {
-        await Status.findOne({_id: status_id}, (err, status) => {
-            if(!status || err) {
-                error = {message: "Invalid status_id"}
-            }
-        }).catch(() => {error = {message: "Invalid status_id"}})
-    }
-    return error
-}
-
-export const statusCreateValidator = async ({desc, title}: statusValidatorPropsType) => {
-    
-    if (!title ||  !desc ) {
-        return {message: "Enter all fields"}
-    }
-    if (typeof title !== 'string' || typeof desc !== 'string' ) {
-        return {message: "All fields must be 'string'"}
-    }
-    if(title.length < 6 || desc.length < 6) {
-        return {message: "Title and Desc must be at least 6 characters"}
-    }
-   
-    return null
-}
-
-export const statusUpdateValidator = async ({desc, title}: statusValidatorPropsType) => {
-    
-    if(typeof title !== 'undefined' && (typeof title !== 'string' || title.length < 6)) {
-        return {message: "Invalid title (must be string, at least 6char)"}
-        
-    }
-    if(typeof desc !== 'undefined' && (typeof desc !== 'string' || desc.length < 6)) {
-        return {message: "Invalid desc (must be string, at least 6char)"}
-        
-    }
-
-    return null
-}
-
-
-
-const errorCreator = () => {
-
-
-    return {
-        errors:
-    }
-}

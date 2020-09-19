@@ -15,11 +15,16 @@ const app = express()
 
 app.use(bodyParser.json())
 
+const MONGODB_URL = process.env.NODE_ENV == "test"
+    ? process.env.TEST_DB_URL as string
+    : process.env.MONGO_DB_URL as string
+
 mongoose.connect(
-    process.env.MONGO_DB_URL as string,
+    MONGODB_URL,
     {
         useNewUrlParser: true,
-        useUnifiedTopology: true
+        useUnifiedTopology: true,
+        useFindAndModify: false 
     }
 ).then(() => console.log("mongo started"))
 .catch((err) => console.error(err))
@@ -30,7 +35,7 @@ app.use(
     session({
         name: process.env.COOKIE_NAME as string,
         store: new MongoStore({
-            url: process.env.MONGO_DB_URL as string,
+            url: MONGODB_URL,
             stringify: false,
         }),
         cookie: {
@@ -52,3 +57,5 @@ app.use("/images", imagesRoutes)
 app.listen(process.env.PORT as string, () => {
     console.log("server started on port: " + process.env.PORT as string)
 })
+
+export default app

@@ -2,72 +2,85 @@ import mongoose from 'mongoose';
 import express from 'express';
 import Status from '../models/Status';
 import isAuthenticated from "./../util/isAuthenticated"
-import {statusCreateValidator, statusUpdateValidator} from "./../util/validator"
+import {statusCreateValidator, statusUpdateValidator} from "./../util/validators/statusValidator"
+import { validationResult } from 'express-validator';
+import { myReq } from 'src/types';
 
 const router = express.Router()
 
-router.get("/", async (req, res) => {
-    try {
-        const statuses = await Status.find().exec()
+router.get("/", (req, res) => {
+    Status.find()
+    .then(statuses => {
         res.status(200).json(statuses)
-    } catch (err) {
-        res.sendStatus(500)
-    }
+    })
+    .catch(err => {
+        res.status(500).json({message: "Server error"})
+    })
 })
 
-router.get("/:id", async (req, res) => {
-    let error = null as any
-    await Status.findById(req.params.id, (err, status) => {
-        if (err || !status) {
-            error = true
-        } else {
-            res.status(200).json(status)
-        }
-    }).catch(() => {error = true})
-    error ? res.sendStatus(404) : null
+router.get("/:id", (req, res) => {
+    Status.findById(req.params.id)
+    .then(status => {
+        status
+        ? res.status(200).json(status)
+        : res.status(404).json({ message: "404 not found" })
+    })
+    .catch(err => {
+        res.status(404).json({ message: "404 not found" })
+    })
 })
 
 //@ts-ignore
-router.post("/", isAuthenticated, async (req, res) => {
-    const error = await statusCreateValidator(req.body)
-    if (error) {
-        return res.status(400).json(error)
+router.post("/", isAuthenticated, statusCreateValidator, (req, res) => {
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+        return res.status(400).json({errors: errors.array({onlyFirstError: true})})
     }
+
     const status = new Status({
         ...req.body,
         _id: new mongoose.Types.ObjectId(),
     })
-    try {
-        await status.save()
+
+    status.save()
+    .then(status => {
         res.status(201).json(status)
-    } catch (err) {
-        res.sendStatus(400)
-    }
+    })
+    .catch(err => {
+        res.status(500).json({message: "Server error"})
+    })
 })
 
 //@ts-ignore
-router.put("/:id", isAuthenticated, async (req, res) => {
+router.put("/:id", isAuthenticated, statusUpdateValidator, (req: myReq, res) => {
     delete req.body._id
-    let error: any = statusUpdateValidator(req.body)
-    if (error) {
-        res.sendStatus(400).json(error)
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+        return res.status(400).json({errors: errors.array({onlyFirstError: true})})
     }
     
-    await Status.updateOne({_id: req.params.id}, req.body, (err, status) => {
-        if (err || !status) {
-            error = true
-        } else {
-            res.sendStatus(200)
-        }
-    }).catch(() => {error = true})
-    error ? res.sendStatus(404) : null
+    Status.findByIdAndUpdate(req.params.id, req.body)
+    .then((status) => {
+        status
+        ? res.status(200).json(status)
+        : res.status(404).json({ message: "404 not found" })
+    })
+    .catch(() => {
+        res.status(404).json({ message: "404 not found" })
+    })
 })
 
 //@ts-ignore
-router.delete("/:id", isAuthenticated, async (req, res) => {
-    let error = null as any
-    await Status.deleteOne({_id: req.params.id}).catch(() => { error = true})
-    error ? res.sendStatus(404) : res.status(200).json({message: "Deleted successful"})
+router.delete("/:id", isAuthenticated, (req, res) => {
+    Status.findByIdAndDelete(req.params.id)
+    .then(status => {
+        status
+        ? res.status(200).json({ message: "Deleted successful" })
+        : res.status(404).json({ message: "404 not found" })
+    })
+    .catch(() => {
+        res.status(404).json({ message: "404 not found" })
+    })
 })
 
 export default router

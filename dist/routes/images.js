@@ -18,43 +18,74 @@ const isAuthenticated_1 = __importDefault(require("./../util/isAuthenticated"));
 const Image_1 = __importDefault(require("./../models/Image"));
 const fs_1 = __importDefault(require("fs"));
 const multer_1 = __importDefault(require("multer"));
+const User_1 = __importDefault(require("../models/User"));
 const UPLOAD_PATH = path_1.default.resolve(__dirname, '../images');
 const upload = multer_1.default({
     dest: UPLOAD_PATH,
-    limits: { fileSize: 1000000, files: 1 }
-});
+    limits: { fileSize: 1024 * 1024, files: 1 },
+    fileFilter: (req, file, cb) => {
+        if (['.jpg', '.jpeg', '.png'].includes(path_1.default.extname(file.originalname))) {
+            return cb(null, true);
+        }
+        return cb(new Error("Wrong format"));
+    }
+}).single('Image');
 const router = express_1.default.Router();
-router.post('/', isAuthenticated_1.default, upload.single('Image'), (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
-    if (!((_a = req.file) === null || _a === void 0 ? void 0 : _a.filename) || !((_b = req.file) === null || _b === void 0 ? void 0 : _b.originalname)) {
-        return res.status(400).json({ message: "Error. Try to download 1 'Image' with fileSize < 1000000" });
-    }
-    const prevImage = yield Image_1.default.findOne({ user_id: req.session.userId }, (err) => { if (err)
-        return res.sendStatus(404); });
-    if (prevImage) {
-        prevImage.filename = req.file.filename;
-        prevImage.originalname = req.file.originalname;
-        yield prevImage.save();
-        return res.json({ message: "Upload successful" });
-    }
-    else {
+router.post('/', isAuthenticated_1.default, (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    upload(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(400).json(err);
+            }
+            if (err.code === 'LIMIT_FILE_COUNT') {
+                return res.status(400).json(err);
+            }
+            return res.status(400).json({ message: err.message });
+        }
+        if (!req.file) {
+            return res.status(400).json({ message: "File is required" });
+        }
         const image = {
             filename: req.file.filename,
             originalname: req.file.originalname,
             user_id: req.session.userId
         };
-        yield Image_1.default.create(image, (err, result) => {
-            if (err)
-                return res.sendStatus(404);
-            return res.json(result);
-        });
-    }
+        let prevImg;
+        Image_1.default.findOne({ user_id: req.session.userId })
+            .then(img => {
+            prevImg = img || null;
+        })
+            .catch(() => { });
+        Image_1.default.create(image)
+            .then((img) => __awaiter(void 0, void 0, void 0, function* () {
+            if (!img) {
+                res.status(500).json({ message: "Server error" });
+            }
+            else {
+                if (prevImg) {
+                    yield fs_1.default.unlink(path_1.default.resolve(UPLOAD_PATH, prevImg.filename), () => { });
+                    yield prevImg.remove().catch(() => { });
+                }
+                User_1.default.findByIdAndUpdate(req.session.userId, { image_id: img._id })
+                    .then(user => {
+                    user
+                        ? res.status(200).json(img)
+                        : res.status(500).json({ message: "Server error" });
+                });
+            }
+        }))
+            .catch(() => res.status(500).json({ message: "Server error" }));
+    });
 }));
-router.get('/', isAuthenticated_1.default, (req, res, next) => {
-    Image_1.default.findOne({ user_id: req.session.userId }, (err, image) => {
-        if (err || !image)
-            return res.sendStatus(404);
-        fs_1.default.createReadStream(path_1.default.resolve(UPLOAD_PATH, image.filename)).pipe(res);
+router.get('/:id', isAuthenticated_1.default, (req, res, next) => {
+    Image_1.default.findById(req.params.id)
+        .then((img) => {
+        img
+            ? fs_1.default.createReadStream(path_1.default.resolve(UPLOAD_PATH, img.filename)).pipe(res)
+            : res.status(404).json({ message: "404 not found" });
+    })
+        .catch(() => {
+        res.status(404).json({ message: "404 not found" });
     });
 });
 exports.default = router;

@@ -16,16 +16,20 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const app = express_1.default();
 app.use(body_parser_1.default.json());
-mongoose_1.default.connect(process.env.MONGO_DB_URL, {
+const MONGODB_URL = process.env.NODE_ENV == "test"
+    ? process.env.TEST_DB_URL
+    : process.env.MONGO_DB_URL;
+mongoose_1.default.connect(MONGODB_URL, {
     useNewUrlParser: true,
-    useUnifiedTopology: true
+    useUnifiedTopology: true,
+    useFindAndModify: false
 }).then(() => console.log("mongo started"))
     .catch((err) => console.error(err));
 const MongoStore = connect_mongo_1.default(express_session_1.default);
 app.use(express_session_1.default({
     name: process.env.COOKIE_NAME,
     store: new MongoStore({
-        url: process.env.MONGO_DB_URL,
+        url: MONGODB_URL,
         stringify: false,
     }),
     cookie: {
@@ -44,4 +48,5 @@ app.use("/images", images_1.default);
 app.listen(process.env.PORT, () => {
     console.log("server started on port: " + process.env.PORT);
 });
+exports.default = app;
 //# sourceMappingURL=index.js.map

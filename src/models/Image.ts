@@ -2,16 +2,15 @@ import mongoose from 'mongoose'
 
 const Image = new mongoose.Schema({
   filename: {
-    type: String,
-    required: true
+    type: String
   },
   originalname: {
-    type: String,
-    required: true
+    type: String
   },
   user_id: {
-      type: String,
-      required: true
+      type:  mongoose.Types.ObjectId,
+      required: true,
+      ref: 'User'
   }
 }, {timestamps: true})
 

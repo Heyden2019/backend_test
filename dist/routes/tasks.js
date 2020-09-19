@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -16,59 +7,70 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const express_1 = __importDefault(require("express"));
 const Task_1 = __importDefault(require("../models/Task"));
 const isAuthenticated_1 = __importDefault(require("./../util/isAuthenticated"));
-const validator_1 = require("./../util/validator");
+const taskValidator_1 = require("./../util/validators/taskValidator");
+const express_validator_1 = require("express-validator");
 const router = express_1.default.Router();
-router.get("/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    yield Task_1.default.find(req.query.status_id ? { status_id: req.query.status_id } : null, (err, tasks) => {
-        if (err) {
-            res.sendStatus(500).json({ message: "error" });
-        }
-        else {
-            res.status(200).json(tasks);
-        }
+router.get("/", (req, res) => {
+    Task_1.default.find(req.query.status_id ? { status_id: req.query.status_id } : {})
+        .then(tasks => {
+        res.status(200).json(tasks);
+    })
+        .catch(err => {
+        res.status(404).json({ message: "404 not found" });
     });
-}));
-router.get("/:id", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    yield Task_1.default.findById(req.params.id, (err, task) => {
-        if (err || !task) {
-            res.sendStatus(404);
-        }
-        else {
-            res.status(200).json(task);
-        }
+});
+router.get("/:id", (req, res) => {
+    Task_1.default.findById(req.params.id)
+        .then(task => {
+        task
+            ? res.status(200).json(task)
+            : res.status(404).json({ message: "404 not found" });
+    })
+        .catch(err => {
+        res.status(404).json({ message: "404 not found" });
     });
-}));
-router.post("/", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const error = yield validator_1.taskCreateValidator(req.body);
-    if (error) {
-        return res.status(400).json(error);
+});
+router.post("/", isAuthenticated_1.default, taskValidator_1.taskCreateValidator, (req, res) => {
+    const errors = express_validator_1.validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array({ onlyFirstError: true }) });
     }
     const task = new Task_1.default(Object.assign(Object.assign({}, req.body), { createdAt: Date.now(), _id: new mongoose_1.default.Types.ObjectId(), user_id: req.session.userId }));
-    try {
-        yield task.save();
+    task.save()
+        .then(task => {
         res.status(201).json(task);
-    }
-    catch (err) {
-        res.sendStatus(400);
-    }
-}));
-router.put("/:id", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    delete req.body._id;
-    let error = yield validator_1.taskUpdateValidator(req.body);
-    if (error) {
-        return res.status(400).json(error);
-    }
-    yield Task_1.default.updateOne({ _id: req.params.id }, Object.assign(Object.assign({}, req.body), { user_id: req.session.userId })).then(() => { res.sendStatus(200); })
-        .catch(() => { res.sendStatus(404); });
-}));
-router.delete("/:id", isAuthenticated_1.default, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    let error = null;
-    yield Task_1.default.deleteOne({ _id: req.params.id }, (err) => {
-        err ? error = true : null;
-    }).catch(() => {
-        error = true;
+    })
+        .catch(err => {
+        res.status(500).json({ message: "Server error" });
     });
-    error ? res.status(404) : res.status(200).json({ message: "Deleted successful" });
-}));
+});
+router.put("/:id", isAuthenticated_1.default, taskValidator_1.taskUpdateValidator, (req, res) => {
+    delete req.body._id;
+    delete req.body.createdAt;
+    const errors = express_validator_1.validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array({ onlyFirstError: true }) });
+    }
+    Task_1.default.findByIdAndUpdate(req.params.id, Object.assign(Object.assign({}, req.body), { user_id: req.session.userId }))
+        .then(task => {
+        task
+            ? res.status(200).json(task)
+            : res.status(404).json({ message: "404 not found" });
+    })
+        .catch(err => {
+        res.status(404).json({ message: "404 not found" });
+    });
+});
+router.delete("/:id", isAuthenticated_1.default, (req, res) => {
+    Task_1.default.findByIdAndDelete(req.params.id)
+        .then(task => {
+        task
+            ? res.status(200).json({ message: "Deleted successful" })
+            : res.status(404).json({ message: "404 not found" });
+    })
+        .catch(err => {
+        res.status(404).json({ message: "404 not found" });
+    });
+});
 exports.default = router;
 //# sourceMappingURL=tasks.js.map
